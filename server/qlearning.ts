@@ -11,6 +11,7 @@ import {
   DEFAULT_EPSILON_MIN,
   HORIZONTAL_OFFSET_BUCKETS,
   VERTICAL_DISTANCE_BUCKETS,
+  BALL_X_DIRECTION_BUCKETS,
   SPEED_BUCKETS,
   CANVAS_HEIGHT,
   GOAL_Y,
@@ -53,12 +54,17 @@ export class QLearningAgent {
     const vDist = GOAL_Y - ball.y;
     const ballSpeed = Math.sqrt(ball.velocity.x ** 2 + ball.velocity.y ** 2);
     
+    // Ball trajectory: normalized x direction (-1 to 1)
+    // This tells us if ball is moving left, right, or straight at us
+    const ballXDir = ballSpeed > 0.1 ? ball.velocity.x / ballSpeed : 0;
+    
     // Discretize
     const hBucket = this.discretizeValue(hOffset, HORIZONTAL_OFFSET_BUCKETS);
     const vBucket = this.discretizeValue(vDist, VERTICAL_DISTANCE_BUCKETS);
     const speedBucket = this.discretizeValue(ballSpeed, SPEED_BUCKETS);
+    const dirBucket = this.discretizeValue(ballXDir, BALL_X_DIRECTION_BUCKETS);
     
-    return `h:${hBucket}|v:${vBucket}|s:${speedBucket}`;
+    return `h:${hBucket}|v:${vBucket}|s:${speedBucket}|d:${dirBucket}`;
   }
 
   getAction(state: string, isTraining: boolean): Action {
@@ -106,27 +112,25 @@ export class QLearningAgent {
       return 0;
     }
 
-    // Calculate reward
+    // Calculate reward - IMPROVED SHAPING
     let reward = 0;
     switch (outcome) {
       case EpisodeOutcome.SAVE:
-        reward = 1.0;
+        // Higher reward for clean saves, extra for contact-based saves
+        reward = this.contactMade ? 2.0 : 1.5;
         break;
       case EpisodeOutcome.GOAL:
-        reward = -1.0;
+        // Penalty for conceding, less if we at least tried (made contact)
+        reward = this.contactMade ? -0.5 : -2.0;
         break;
       case EpisodeOutcome.MISS:
-        reward = 0.0;
+        // Small penalty for misses - should have been in position
+        reward = -0.3;
         break;
     }
 
-    // Add contact bonus
-    if (this.contactMade) {
-      reward += 0.1;
-    }
-
-    // Add small time penalty (assume ~60 frames per episode average)
-    reward -= 0.01;
+    // Reduced time penalty - encourage proper positioning over rushing
+    reward -= 0.005;
 
     // Q-learning update
     const currentQ = this.qTable[this.lastState][this.lastAction];

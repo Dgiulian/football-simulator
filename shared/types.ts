@@ -24,27 +24,28 @@ export const ROBOT_WIDTH = 40;
 export const ROBOT_HEIGHT = 25;
 export const WHEEL_RADIUS = 6;
 
-// Physics
-export const BALL_FRICTION = 0.995;
-export const GOALKEEPER_SPEED = 5;
-export const DIVE_SPEED = 12;
-export const DIVE_DURATION = 15; // frames
-export const BALL_MIN_SPEED = 0.5;
+// Physics - IMPROVED for better learning
+export const BALL_FRICTION = 0.998; // Less friction = longer shots, more time to react
+export const GOALKEEPER_SPEED = 8; // Faster to catch up to balls
+export const DIVE_SPEED = 15; // Faster dives
+export const DIVE_DURATION = 10; // Shorter dive commitment
+export const BALL_MIN_SPEED = 0.3; // Slower threshold for stopping
 
-// Q-learning defaults
-export const DEFAULT_LEARNING_RATE = 0.2;
-export const DEFAULT_DISCOUNT_FACTOR = 0.95;
+// Q-learning defaults - OPTIMIZED for this problem
+export const DEFAULT_LEARNING_RATE = 0.3; // Faster learning
+export const DEFAULT_DISCOUNT_FACTOR = 0.97; // Slightly more forward-looking
 export const DEFAULT_EPSILON = 1.0;
-export const DEFAULT_EPSILON_DECAY = 0.995;
-export const DEFAULT_EPSILON_MIN = 0.01;
+export const DEFAULT_EPSILON_DECAY = 0.998; // Slower decay = more exploration
+export const DEFAULT_EPSILON_MIN = 0.05; // Keep some minimum exploration
 
 // Speed multipliers
 export const SPEED_MULTIPLIERS = [1, 5, 10];
 
-// State space discretization
-export const HORIZONTAL_OFFSET_BUCKETS = [-100, -50, -20, -10, -5, 0, 5, 10, 20, 50, 100];
-export const VERTICAL_DISTANCE_BUCKETS = [50, 100, 200, 300, 400];
-export const SPEED_BUCKETS = [5, 10, 15]; // slow, medium, fast thresholds
+// State space discretization - FINER near center where precision matters
+export const HORIZONTAL_OFFSET_BUCKETS = [-150, -80, -40, -20, -10, -5, -2, 0, 2, 5, 10, 20, 40, 80, 150];
+export const VERTICAL_DISTANCE_BUCKETS = [30, 60, 100, 150, 250, 400];
+export const BALL_X_DIRECTION_BUCKETS = [-0.5, 0, 0.5]; // Is ball moving left, straight, or right?
+export const SPEED_BUCKETS = [4, 8, 12, 16]; // More granular speed levels
 
 export enum Action {
   MOVE_LEFT = 0,
