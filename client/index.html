@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Football Simulator - Q-Learning Goalkeeper</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    
+    h1 {
+      margin-bottom: 20px;
+      text-align: center;
+      color: #4ecca3;
+      text-shadow: 0 0 10px rgba(78, 204, 163, 0.5);
+    }
+    
+    .main-container {
+      display: flex;
+      gap: 20px;
+      max-width: 1200px;
+      width: 100%;
+    }
+    
+    .canvas-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    canvas {
+      border: 3px solid #4ecca3;
+      border-radius: 8px;
+      box-shadow: 0 0 20px rgba(78, 204, 163, 0.3);
+      background: #2d5a3d;
+    }
+    
+    .controls-panel {
+      width: 320px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 20px;
+      backdrop-filter: blur(10px);
+    }
+    
+    .control-group {
+      margin-bottom: 20px;
+    }
+    
+    .control-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 14px;
+      color: #a0a0a0;
+    }
+    
+    .control-group input[type="range"] {
+      width: 100%;
+      margin-bottom: 5px;
+    }
+    
+    .control-group .value {
+      text-align: right;
+      color: #4ecca3;
+      font-weight: bold;
+    }
+    
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    
+    button {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .btn-primary {
+      background: #4ecca3;
+      color: #1a1a2e;
+    }
+    
+    .btn-primary:hover {
+      background: #3db892;
+      transform: translateY(-2px);
+    }
+    
+    .btn-secondary {
+      background: #e94560;
+      color: #fff;
+    }
+    
+    .btn-secondary:hover {
+      background: #d63d54;
+    }
+    
+    .btn-toggle {
+      background: #0f3460;
+      color: #fff;
+    }
+    
+    .btn-toggle:hover {
+      background: #1a4a7a;
+    }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    
+    .stat-box {
+      background: rgba(255, 255, 255, 0.05);
+      padding: 10px;
+      border-radius: 6px;
+      text-align: center;
+    }
+    
+    .stat-label {
+      font-size: 12px;
+      color: #a0a0a0;
+    }
+    
+    .stat-value {
+      font-size: 18px;
+      font-weight: bold;
+      color: #4ecca3;
+    }
+    
+    .speed-controls {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 20px;
+    }
+    
+    .speed-btn {
+      flex: 1;
+      padding: 8px;
+      font-size: 12px;
+      background: #0f3460;
+    }
+    
+    .speed-btn.active {
+      background: #4ecca3;
+      color: #1a1a2e;
+    }
+    
+    .mode-indicator {
+      text-align: center;
+      padding: 10px;
+      border-radius: 6px;
+      font-weight: bold;
+      margin-bottom: 20px;
+    }
+    
+    .mode-training {
+      background: rgba(78, 204, 163, 0.2);
+      color: #4ecca3;
+    }
+    
+    .mode-evaluation {
+      background: rgba(233, 69, 96, 0.2);
+      color: #e94560;
+    }
+    
+    .legend {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+    
+    .legend-color {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🤖 Football Simulator - Q-Learning Goalkeeper</h1>
+  
+  <div class="main-container">
+    <div class="canvas-container">
+      <canvas id="gameCanvas" width="800" height="600"></canvas>
+    </div>
+    
+    <div class="controls-panel">
+      <div id="modeIndicator" class="mode-indicator mode-training">
+        Training Mode
+      </div>
+      
+      <div class="button-group">
+        <button id="toggleBtn" class="btn-primary">Start Training</button>
+        <button id="resetBtn" class="btn-secondary">Reset Agent</button>
+      </div>
+      
+      <button id="modeBtn" class="btn-toggle">Switch to Evaluation</button>
+      
+      <div class="control-group">
+        <label>Simulation Speed</label>
+        <div class="speed-controls">
+          <button class="speed-btn active" data-speed="1">1x</button>
+          <button class="speed-btn" data-speed="5">5x</button>
+          <button class="speed-btn" data-speed="10">10x</button>
+        </div>
+      </div>
+      
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-label">Episodes</div>
+          <div id="episodeCount" class="stat-value">0</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Save %</div>
+          <div id="savePercentage" class="stat-value">0%</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Saves</div>
+          <div id="savesCount" class="stat-value">0</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Goals</div>
+          <div id="goalsCount" class="stat-value">0</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Epsilon</div>
+          <div id="epsilonValue" class="stat-value">1.00</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Best Streak</div>
+          <div id="bestStreak" class="stat-value">0</div>
+        </div>
+      </div>
+      
+      <div class="control-group">
+        <label>Learning Rate (α): <span id="alphaValue" class="value">0.20</span></label>
+        <input type="range" id="alphaSlider" min="0.01" max="0.5" step="0.01" value="0.2">
+      </div>
+      
+      <div class="control-group">
+        <label>Discount Factor (γ): <span id="gammaValue" class="value">0.95</span></label>
+        <input type="range" id="gammaSlider" min="0.8" max="0.99" step="0.01" value="0.95">
+      </div>
+      
+      <div class="control-group">
+        <label>Epsilon Decay: <span id="decayValue" class="value">0.995</span></label>
+        <input type="range" id="decaySlider" min="0.990" max="0.9999" step="0.0001" value="0.995">
+      </div>
+      
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-color" style="background: #ff4444;"></div>
+          <span>Robot (Shooter)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #4444ff;"></div>
+          <span>Goalkeeper</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #ffffff;"></div>
+          <span>Ball</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script src="client.js"></script>
+</body>
+</html>
