@@ -97,6 +97,10 @@ export class QLearningAgent {
     this.contactMade = true;
   }
 
+  hasContactBeenMade(): boolean {
+    return this.contactMade;
+  }
+
   learn(outcome: EpisodeOutcome): number {
     if (this.lastState === null || this.lastAction === null) {
       return 0;

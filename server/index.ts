@@ -193,40 +193,63 @@ class FootballServer {
 
   private update(): void {
     if (!this.isRunning) return;
-    
+
     this.episodeFrameCount++;
-    
+
     const state = this.agent.getStateKey(this.ball, this.goalkeeper);
     const action = this.agent.getAction(state, this.mode === GameMode.TRAINING);
-    
+
     this.agent.storeTransition(state, action);
-    
+
     executeAction(this.goalkeeper, action);
-    
+
     updateGoalkeeper(this.goalkeeper);
     const ballStopped = updateBall(this.ball);
-    
+
     if (checkBallCollision(this.ball, this.goalkeeper)) {
       this.agent.setContactMade();
+      // Debug: log contact (throttled)
+      if (this.stats.totalEpisodes % 10 === 0) {
+        console.log(`  -> Ball contact! Ball@(${this.ball.x.toFixed(1)},${this.ball.y.toFixed(1)}) GK@(${this.goalkeeper.x.toFixed(1)},${this.goalkeeper.y.toFixed(1)})`);
+      }
     }
-    
+
     const outcome = checkGoal(this.ball);
-    
+
     if (outcome || ballStopped) {
-      const finalOutcome = outcome || EpisodeOutcome.MISS;
+      // Determine final outcome
+      let finalOutcome: EpisodeOutcome;
+      if (outcome) {
+        // If ball hit goalkeeper and didn't score, it's a save
+        if (outcome === EpisodeOutcome.GOAL) {
+          finalOutcome = EpisodeOutcome.GOAL;
+        } else {
+          // It's a miss - check if goalkeeper made contact
+          finalOutcome = this.agent.hasContactBeenMade() ? EpisodeOutcome.SAVE : EpisodeOutcome.MISS;
+        }
+      } else {
+        // Ball stopped - check if goalkeeper made contact
+        finalOutcome = this.agent.hasContactBeenMade() ? EpisodeOutcome.SAVE : EpisodeOutcome.MISS;
+      }
       this.endEpisode(finalOutcome);
     }
   }
 
   private endEpisode(outcome: EpisodeOutcome): void {
     const reward = this.agent.learn(outcome);
-    
+
+    // Debug logging every 100 episodes
+    const contactMade = this.agent.hasContactBeenMade();
+    if (this.stats.totalEpisodes % 100 === 0) {
+      console.log(`Episode ${this.stats.totalEpisodes}: outcome=${outcome}, reward=${reward.toFixed(2)}, contact=${contactMade}, epsilon=${this.agent.getEpsilon().toFixed(3)}`);
+    }
+
     this.stats.totalEpisodes++;
     this.recentRewards.push(reward);
     if (this.recentRewards.length > 100) {
       this.recentRewards.shift();
     }
-    
+
     switch (outcome) {
       case EpisodeOutcome.SAVE:
         this.stats.saves++;
