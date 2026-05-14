@@ -11,7 +11,6 @@ import {
   DEFAULT_EPSILON_MIN,
   HORIZONTAL_OFFSET_BUCKETS,
   VERTICAL_DISTANCE_BUCKETS,
-  BALL_X_DIRECTION_BUCKETS,
   SPEED_BUCKETS,
   CANVAS_HEIGHT,
   GOAL_Y,
@@ -54,17 +53,12 @@ export class QLearningAgent {
     const vDist = GOAL_Y - ball.y;
     const ballSpeed = Math.sqrt(ball.velocity.x ** 2 + ball.velocity.y ** 2);
     
-    // Ball trajectory: normalized x direction (-1 to 1)
-    // This tells us if ball is moving left, right, or straight at us
-    const ballXDir = ballSpeed > 0.1 ? ball.velocity.x / ballSpeed : 0;
-    
-    // Discretize
+    // Discretize - SIMPLE: only 5×3×3 = 45 states
     const hBucket = this.discretizeValue(hOffset, HORIZONTAL_OFFSET_BUCKETS);
     const vBucket = this.discretizeValue(vDist, VERTICAL_DISTANCE_BUCKETS);
     const speedBucket = this.discretizeValue(ballSpeed, SPEED_BUCKETS);
-    const dirBucket = this.discretizeValue(ballXDir, BALL_X_DIRECTION_BUCKETS);
     
-    return `h:${hBucket}|v:${vBucket}|s:${speedBucket}|d:${dirBucket}`;
+    return `h:${hBucket}|v:${vBucket}|s:${speedBucket}`;
   }
 
   getAction(state: string, isTraining: boolean): Action {
@@ -112,25 +106,28 @@ export class QLearningAgent {
       return 0;
     }
 
-    // Calculate reward - IMPROVED SHAPING
+    // Calculate reward - SIMPLE and CORRECT
+    // MISS = ball went wide = NO GOAL = good for goalkeeper!
     let reward = 0;
     switch (outcome) {
       case EpisodeOutcome.SAVE:
-        // Higher reward for clean saves, extra for contact-based saves
-        reward = this.contactMade ? 2.0 : 1.5;
+        reward = 1.0; // Good job touching the ball
         break;
       case EpisodeOutcome.GOAL:
-        // Penalty for conceding, less if we at least tried (made contact)
-        reward = this.contactMade ? -0.5 : -2.0;
+        reward = -1.0; // Bad, conceded a goal
         break;
       case EpisodeOutcome.MISS:
-        // Small penalty for misses - should have been in position
-        reward = -0.3;
+        reward = 0.1; // Ball went wide - no goal conceded! Slight positive
         break;
     }
 
-    // Reduced time penalty - encourage proper positioning over rushing
-    reward -= 0.005;
+    // Contact bonus
+    if (this.contactMade) {
+      reward += 0.1;
+    }
+
+    // Small time penalty per step
+    reward -= 0.01;
 
     // Q-learning update
     const currentQ = this.qTable[this.lastState][this.lastAction];

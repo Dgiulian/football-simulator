@@ -31,21 +31,21 @@ export const DIVE_SPEED = 15; // Faster dives
 export const DIVE_DURATION = 10; // Shorter dive commitment
 export const BALL_MIN_SPEED = 0.3; // Slower threshold for stopping
 
-// Q-learning defaults - OPTIMIZED for this problem
-export const DEFAULT_LEARNING_RATE = 0.3; // Faster learning
-export const DEFAULT_DISCOUNT_FACTOR = 0.97; // Slightly more forward-looking
+// Q-learning defaults - BALANCED
+export const DEFAULT_LEARNING_RATE = 0.2; // Standard learning rate
+export const DEFAULT_DISCOUNT_FACTOR = 0.95; // Standard discount
 export const DEFAULT_EPSILON = 1.0;
-export const DEFAULT_EPSILON_DECAY = 0.998; // Slower decay = more exploration
-export const DEFAULT_EPSILON_MIN = 0.05; // Keep some minimum exploration
+export const DEFAULT_EPSILON_DECAY = 0.995; // Good balance: explore early, exploit later
+export const DEFAULT_EPSILON_MIN = 0.01; // Almost pure exploitation eventually
 
 // Speed multipliers
 export const SPEED_MULTIPLIERS = [1, 5, 10];
 
-// State space discretization - FINER near center where precision matters
-export const HORIZONTAL_OFFSET_BUCKETS = [-150, -80, -40, -20, -10, -5, -2, 0, 2, 5, 10, 20, 40, 80, 150];
-export const VERTICAL_DISTANCE_BUCKETS = [30, 60, 100, 150, 250, 400];
-export const BALL_X_DIRECTION_BUCKETS = [-0.5, 0, 0.5]; // Is ball moving left, straight, or right?
-export const SPEED_BUCKETS = [4, 8, 12, 16]; // More granular speed levels
+// State space discretization - SMALL and EFFECTIVE
+// Key insight: only 5 horizontal buckets = 120 states total, easy to learn
+export const HORIZONTAL_OFFSET_BUCKETS = [-100, -30, 0, 30, 100];
+export const VERTICAL_DISTANCE_BUCKETS = [80, 200, 400];
+export const SPEED_BUCKETS = [8, 14]; // 2 speeds: slow (<8), medium (8-14), fast (>14)
 
 export enum Action {
   MOVE_LEFT = 0,
