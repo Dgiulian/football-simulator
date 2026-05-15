@@ -656,3 +656,96 @@ setInterval(requestCurrentQValues, 500);
 // Initial requests
 setTimeout(requestHeatmap, 2000);
 setTimeout(requestCurrentQValues, 1500);
+
+// ============================================
+// KEYBOARD SHORTCUTS
+// ============================================
+
+document.addEventListener('keydown', (e) => {
+  // Ignore if user is typing in an input
+  if (e.target.tagName === 'INPUT') return;
+  
+  switch(e.key.toLowerCase()) {
+    case ' ':
+      e.preventDefault();
+      document.getElementById('toggleBtn').click();
+      break;
+    case 'r':
+      if (confirm('Reset the agent? All progress will be lost.')) {
+        document.getElementById('resetBtn').click();
+      }
+      break;
+    case 'm':
+      document.getElementById('modeBtn').click();
+      break;
+    case '1':
+      setSpeed(1);
+      break;
+    case '2':
+      setSpeed(5);
+      break;
+    case '3':
+      setSpeed(10);
+      break;
+    case 'c':
+      // Toggle charts visibility
+      const charts = document.querySelector('.charts-container');
+      const qtable = document.querySelector('.qtable-panel');
+      const isHidden = charts.style.display === 'none';
+      charts.style.display = isHidden ? 'grid' : 'none';
+      qtable.style.display = isHidden ? 'block' : 'none';
+      break;
+  }
+});
+
+function setSpeed(speed) {
+  // Update UI
+  document.querySelectorAll('.speed-btn').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.speed) === speed);
+  });
+  
+  // Send to server
+  ws.send(JSON.stringify({
+    type: 'set_speed',
+    data: { speed }
+  }));
+}
+
+// Add keyboard shortcut help tooltip
+const helpTooltip = document.createElement('div');
+helpTooltip.style.cssText = `
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: rgba(0,0,0,0.8);
+  color: #fff;
+  padding: 15px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-family: monospace;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+`;
+helpTooltip.innerHTML = `
+  <strong>Keyboard Shortcuts:</strong><br>
+  Space - Start/Pause<br>
+  R - Reset Agent<br>
+  M - Toggle Mode<br>
+  1/2/3 - Speed 1x/5x/10x<br>
+  C - Toggle Charts<br>
+  H - Show/Hide Help
+`;
+document.body.appendChild(helpTooltip);
+
+// Show help on 'H' key
+document.addEventListener('keydown', (e) => {
+  if (e.key.toLowerCase() === 'h') {
+    helpTooltip.style.opacity = helpTooltip.style.opacity === '1' ? '0' : '1';
+  }
+});
+
+// Show help briefly on load
+setTimeout(() => { helpTooltip.style.opacity = '1'; }, 1000);
+setTimeout(() => { helpTooltip.style.opacity = '0'; }, 6000);
