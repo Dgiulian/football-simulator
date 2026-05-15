@@ -61,6 +61,7 @@ class FootballServer {
   };
   private recentRewards: number[] = [];
   private startTime: number = Date.now();
+  private bestSavePercentage: number = 0;
 
   constructor() {
     this.ball = createBall();
@@ -175,6 +176,7 @@ class FootballServer {
     this.startTime = Date.now();
     this.episodeFrameCount = 0;
     this.agent.clearReplayBuffer();
+    this.bestSavePercentage = 0;
   }
 
   private startGameLoop(): void {
@@ -296,6 +298,13 @@ class FootballServer {
     this.stats.currentEpsilon = this.agent.getEpsilon();
     this.stats.replayBufferSize = this.agent.getReplayBufferSize();
 
+    // Check if this is a new best save percentage
+    if (this.stats.savePercentage > this.bestSavePercentage && this.stats.totalEpisodes > 100) {
+      this.bestSavePercentage = this.stats.savePercentage;
+      this.saveBestModel();
+      console.log(`🏆 NEW BEST! Save %: ${this.bestSavePercentage.toFixed(1)}% at episode ${this.stats.totalEpisodes}`);
+    }
+
     this.broadcastMessage({
       type: 'episode_complete',
       data: { outcome, reward, episode: this.stats.totalEpisodes }
@@ -374,6 +383,38 @@ class FootballServer {
     
     // Keep only last 10 models to save space
     this.db.deleteOldModels(10);
+  }
+
+  private saveBestModel(): void {
+    const bestModelData = {
+      episodes: this.stats.totalEpisodes,
+      savePercentage: this.bestSavePercentage,
+      epsilon: this.agent.getEpsilon(),
+      hyperparameters: this.agent.getHyperparameters(),
+      qTable: this.agent.getQTable(),
+      timestamp: new Date().toISOString()
+    };
+    
+    const fs = require('fs');
+    const path = require('path');
+    const bestModelPath = path.join(__dirname, '..', 'data', 'best_model.json');
+    
+    // Ensure data directory exists
+    const dataDir = path.join(__dirname, '..', 'data');
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    
+    fs.writeFileSync(bestModelPath, JSON.stringify(bestModelData, null, 2));
+    
+    // Also save to database with special flag
+    this.db.saveModel(
+      this.stats.totalEpisodes,
+      this.bestSavePercentage,
+      this.agent.getEpsilon(),
+      this.agent.getHyperparameters(),
+      this.agent.getQTable()
+    );
   }
 
   private loadLatestModel(): void {
