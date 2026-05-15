@@ -1,7 +1,9 @@
-import Database from 'better-sqlite3';
+import * as fs from 'fs';
 import * as path from 'path';
 
-const DB_PATH = path.join(__dirname, '..', 'models.db');
+const DATA_DIR = path.join(__dirname, '..', 'data');
+const MODELS_FILE = path.join(DATA_DIR, 'models.json');
+const METRICS_FILE = path.join(DATA_DIR, 'metrics.json');
 
 export interface ModelRecord {
   id: number;
@@ -26,47 +28,54 @@ export interface MetricRecord {
 }
 
 export class ModelDatabase {
-  private db: Database.Database;
+  private models: ModelRecord[] = [];
+  private metrics: MetricRecord[] = [];
+  private nextModelId = 1;
+  private nextMetricId = 1;
 
   constructor() {
-    this.db = new Database(DB_PATH);
-    this.initializeTables();
+    // Ensure data directory exists
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    
+    this.loadData();
   }
 
-  private initializeTables(): void {
-    // Models table - stores Q-table snapshots
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS models (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        episodes INTEGER NOT NULL,
-        save_percentage REAL NOT NULL,
-        epsilon REAL NOT NULL,
-        hyperparameters TEXT NOT NULL,
-        qtable TEXT NOT NULL
-      )
-    `);
+  private loadData(): void {
+    try {
+      if (fs.existsSync(MODELS_FILE)) {
+        const data = fs.readFileSync(MODELS_FILE, 'utf-8');
+        const parsed = JSON.parse(data);
+        this.models = parsed.models || [];
+        this.nextModelId = parsed.nextModelId || 1;
+      }
+      
+      if (fs.existsSync(METRICS_FILE)) {
+        const data = fs.readFileSync(METRICS_FILE, 'utf-8');
+        const parsed = JSON.parse(data);
+        this.metrics = parsed.metrics || [];
+        this.nextMetricId = parsed.nextMetricId || 1;
+      }
+    } catch (err) {
+      console.log('No existing data found, starting fresh');
+    }
+  }
 
-    // Metrics table - stores time-series training data for graphs
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS metrics (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        episode INTEGER NOT NULL,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-        save_percentage REAL NOT NULL,
-        epsilon REAL NOT NULL,
-        average_reward REAL NOT NULL,
-        total_saves INTEGER NOT NULL,
-        total_goals INTEGER NOT NULL,
-        total_misses INTEGER NOT NULL
-      )
-    `);
-
-    // Create indexes for faster queries
-    this.db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_metrics_episode ON metrics(episode);
-      CREATE INDEX IF NOT EXISTS idx_models_episodes ON models(episodes);
-    `);
+  private saveData(): void {
+    try {
+      fs.writeFileSync(MODELS_FILE, JSON.stringify({
+        models: this.models,
+        nextModelId: this.nextModelId
+      }, null, 2));
+      
+      fs.writeFileSync(METRICS_FILE, JSON.stringify({
+        metrics: this.metrics,
+        nextMetricId: this.nextMetricId
+      }, null, 2));
+    } catch (err) {
+      console.error('Error saving data:', err);
+    }
   }
 
   saveModel(
@@ -76,20 +85,20 @@ export class ModelDatabase {
     hyperparameters: object,
     qtable: object
   ): number {
-    const stmt = this.db.prepare(`
-      INSERT INTO models (episodes, save_percentage, epsilon, hyperparameters, qtable)
-      VALUES (?, ?, ?, ?, ?)
-    `);
-    
-    const result = stmt.run(
+    const model: ModelRecord = {
+      id: this.nextModelId++,
+      created_at: new Date().toISOString(),
       episodes,
-      savePercentage,
+      save_percentage: savePercentage,
       epsilon,
-      JSON.stringify(hyperparameters),
-      JSON.stringify(qtable)
-    );
+      hyperparameters: JSON.stringify(hyperparameters),
+      qtable: JSON.stringify(qtable)
+    };
     
-    return result.lastInsertRowid as number;
+    this.models.push(model);
+    this.saveData();
+    
+    return model.id;
   }
 
   saveMetric(
@@ -101,69 +110,63 @@ export class ModelDatabase {
     totalGoals: number,
     totalMisses: number
   ): void {
-    const stmt = this.db.prepare(`
-      INSERT INTO metrics (episode, save_percentage, epsilon, average_reward, total_saves, total_goals, total_misses)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
+    const metric: MetricRecord = {
+      id: this.nextMetricId++,
+      episode,
+      timestamp: new Date().toISOString(),
+      save_percentage: savePercentage,
+      epsilon,
+      average_reward: averageReward,
+      total_saves: totalSaves,
+      total_goals: totalGoals,
+      total_misses: totalMisses
+    };
     
-    stmt.run(episode, savePercentage, epsilon, averageReward, totalSaves, totalGoals, totalMisses);
+    this.metrics.push(metric);
+    
+    // Keep only last 5000 metrics to prevent file bloat
+    if (this.metrics.length > 5000) {
+      this.metrics = this.metrics.slice(-5000);
+    }
+    
+    this.saveData();
   }
 
   getLatestModel(): ModelRecord | null {
-    const stmt = this.db.prepare(`
-      SELECT * FROM models ORDER BY created_at DESC LIMIT 1
-    `);
-    return stmt.get() as ModelRecord | null;
+    if (this.models.length === 0) return null;
+    return this.models[this.models.length - 1];
   }
 
   getModelById(id: number): ModelRecord | null {
-    const stmt = this.db.prepare('SELECT * FROM models WHERE id = ?');
-    return stmt.get(id) as ModelRecord | null;
+    return this.models.find(m => m.id === id) || null;
   }
 
   getAllModels(limit: number = 100): ModelRecord[] {
-    const stmt = this.db.prepare(`
-      SELECT * FROM models ORDER BY created_at DESC LIMIT ?
-    `);
-    return stmt.all(limit) as ModelRecord[];
+    return this.models.slice(-limit);
   }
 
-  getMetricsForGraphs(windowSize: number = 100): MetricRecord[] {
-    // Get metrics sampled every N episodes for smoother graphs
-    const stmt = this.db.prepare(`
-      SELECT * FROM metrics 
-      WHERE episode % ? = 0 
-      ORDER BY episode ASC
-    `);
-    return stmt.all(windowSize) as MetricRecord[];
+  getMetricsForGraphs(windowSize: number = 10): MetricRecord[] {
+    // Return every Nth metric for smoother graphs
+    return this.metrics.filter((_, index) => index % windowSize === 0);
   }
 
   getMetricsRange(startEpisode: number, endEpisode: number): MetricRecord[] {
-    const stmt = this.db.prepare(`
-      SELECT * FROM metrics 
-      WHERE episode >= ? AND episode <= ?
-      ORDER BY episode ASC
-    `);
-    return stmt.all(startEpisode, endEpisode) as MetricRecord[];
+    return this.metrics.filter(m => m.episode >= startEpisode && m.episode <= endEpisode);
   }
 
   getTotalEpisodes(): number {
-    const stmt = this.db.prepare('SELECT MAX(episode) as max FROM metrics');
-    const result = stmt.get() as { max: number };
-    return result.max || 0;
+    if (this.metrics.length === 0) return 0;
+    return Math.max(...this.metrics.map(m => m.episode));
   }
 
   deleteOldModels(keepLatest: number = 10): void {
-    const stmt = this.db.prepare(`
-      DELETE FROM models 
-      WHERE id NOT IN (
-        SELECT id FROM models ORDER BY created_at DESC LIMIT ?
-      )
-    `);
-    stmt.run(keepLatest);
+    if (this.models.length > keepLatest) {
+      this.models = this.models.slice(-keepLatest);
+      this.saveData();
+    }
   }
 
   close(): void {
-    this.db.close();
+    this.saveData();
   }
 }
