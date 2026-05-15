@@ -156,6 +156,36 @@ export class QLearningAgent {
     return this.qTable;
   }
 
+  getQTableHeatmap(): { state: string; actions: number[]; bestAction: Action; bestValue: number }[] {
+    const heatmapData: { state: string; actions: number[]; bestAction: Action; bestValue: number }[] = [];
+    
+    for (const [state, qValues] of Object.entries(this.qTable)) {
+      let bestAction = Action.MOVE_LEFT;
+      let bestValue = qValues[0];
+      
+      for (let i = 1; i < 4; i++) {
+        if (qValues[i] > bestValue) {
+          bestValue = qValues[i];
+          bestAction = i as Action;
+        }
+      }
+      
+      heatmapData.push({
+        state,
+        actions: [...qValues],
+        bestAction,
+        bestValue
+      });
+    }
+    
+    // Sort by best value descending (most confident predictions first)
+    return heatmapData.sort((a, b) => b.bestValue - a.bestValue);
+  }
+
+  getCurrentStateQValues(state: string): number[] | null {
+    return this.qTable[state] || null;
+  }
+
   getHyperparameters(): Hyperparameters {
     return { ...this.hyperparams };
   }

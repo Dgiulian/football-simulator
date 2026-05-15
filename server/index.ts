@@ -145,6 +145,14 @@ class FootballServer {
       case 'get_graph_data':
         this.sendGraphData(ws);
         break;
+
+      case 'get_qtable_heatmap':
+        this.sendQTableHeatmap(ws);
+        break;
+
+      case 'get_current_qvalues':
+        this.sendCurrentQValues(ws);
+        break;
     }
   }
 
@@ -401,6 +409,38 @@ class FootballServer {
       }));
     } catch (err) {
       console.error('Error sending graph data:', err);
+    }
+  }
+
+  private sendQTableHeatmap(ws: WebSocket): void {
+    try {
+      const heatmapData = this.agent.getQTableHeatmap();
+      ws.send(JSON.stringify({
+        type: 'qtable_heatmap',
+        data: heatmapData
+      }));
+    } catch (err) {
+      console.error('Error sending Q-table heatmap:', err);
+    }
+  }
+
+  private sendCurrentQValues(ws: WebSocket): void {
+    try {
+      const state = this.agent.getStateKey(this.ball, this.goalkeeper);
+      const qValues = this.agent.getCurrentStateQValues(state);
+      const actionNames = ['Move Left', 'Move Right', 'Dive Left', 'Dive Right'];
+      
+      ws.send(JSON.stringify({
+        type: 'current_qvalues',
+        data: {
+          state,
+          qValues,
+          actionNames,
+          bestAction: qValues ? qValues.indexOf(Math.max(...qValues)) : null
+        }
+      }));
+    } catch (err) {
+      console.error('Error sending current Q-values:', err);
     }
   }
 }

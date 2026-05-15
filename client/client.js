@@ -538,6 +538,12 @@ ws.onmessage = (event) => {
     case 'graph_data':
       updateCharts(msg.data);
       break;
+    case 'qtable_heatmap':
+      renderHeatmap(msg.data);
+      break;
+    case 'current_qvalues':
+      renderCurrentQValues(msg.data);
+      break;
   }
 };
 
@@ -549,3 +555,104 @@ setInterval(requestGraphData, 5000);
 
 // Initial request
 setTimeout(requestGraphData, 1000);
+
+// ============================================
+// Q-TABLE HEATMAP
+// ============================================
+
+// Action colors for heatmap
+const actionColors = {
+  0: '#2196f3', // Move Left - Blue
+  1: '#4caf50', // Move Right - Green
+  2: '#ff9800', // Dive Left - Orange
+  3: '#f44336'  // Dive Right - Red
+};
+
+const actionNames = ['←', '→', '🤿L', '🤿R'];
+
+// Render Q-table heatmap
+function renderHeatmap(heatmapData) {
+  const grid = document.getElementById('heatmapGrid');
+  grid.innerHTML = '';
+  
+  // Show top 25 most confident states
+  const topStates = heatmapData.slice(0, 25);
+  
+  topStates.forEach(stateData => {
+    const cell = document.createElement('div');
+    cell.className = 'heatmap-cell';
+    
+    // Color based on best action
+    const baseColor = actionColors[stateData.bestAction];
+    
+    // Opacity based on confidence (bestValue)
+    // Normalize: assuming Q-values range from -2 to +2
+    const normalizedValue = Math.max(0, Math.min(1, (stateData.bestValue + 2) / 4));
+    
+    cell.style.backgroundColor = baseColor;
+    cell.style.opacity = 0.3 + (normalizedValue * 0.7);
+    cell.textContent = actionNames[stateData.bestAction];
+    cell.title = `${stateData.state}\nQ-values: ${stateData.actions.map((v, i) => `${actionNames[i]}:${v.toFixed(2)}`).join(', ')}`;
+    
+    grid.appendChild(cell);
+  });
+}
+
+// Render current Q-values bar
+function renderCurrentQValues(data) {
+  const bar = document.getElementById('qvaluesBar');
+  bar.innerHTML = '';
+  
+  if (!data.qValues) {
+    bar.innerHTML = '<div style="text-align:center; color:#666; font-size:12px;">No Q-values yet</div>';
+    return;
+  }
+  
+  // Find min and max for normalization
+  const minQ = Math.min(...data.qValues);
+  const maxQ = Math.max(...data.qValues);
+  const range = maxQ - minQ || 1;
+  
+  data.qValues.forEach((qValue, index) => {
+    const segment = document.createElement('div');
+    segment.className = 'qvalue-segment';
+    
+    // Width proportional to Q-value (normalized)
+    const normalizedWidth = ((qValue - minQ) / range) * 100;
+    segment.style.width = `${Math.max(10, normalizedWidth)}%`;
+    
+    // Color based on action
+    segment.style.backgroundColor = actionColors[index];
+    
+    // Highlight best action
+    if (index === data.bestAction) {
+      segment.style.boxShadow = '0 0 10px #fff';
+      segment.style.zIndex = '10';
+    }
+    
+    segment.textContent = qValue.toFixed(2);
+    segment.title = `${data.actionNames[index]}: ${qValue.toFixed(3)}`;
+    
+    bar.appendChild(segment);
+  });
+}
+
+// Request Q-table heatmap
+function requestHeatmap() {
+  ws.send(JSON.stringify({ type: 'get_qtable_heatmap' }));
+}
+
+// Request current Q-values
+function requestCurrentQValues() {
+  ws.send(JSON.stringify({ type: 'get_current_qvalues' }));
+}
+
+// Request heatmap periodically (every 10 seconds)
+setInterval(requestHeatmap, 10000);
+
+// Request current Q-values frequently (every 500ms)
+setInterval(requestCurrentQValues, 500);
+
+// Initial requests
+setTimeout(requestHeatmap, 2000);
+setTimeout(requestCurrentQValues, 1500);

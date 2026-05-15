@@ -141,13 +141,29 @@ export interface GraphData {
   misses: number[];
 }
 
+// Q-Table heatmap data
+export interface QTableHeatmapData {
+  state: string;
+  actions: number[];
+  bestAction: number;
+  bestValue: number;
+}
+
+// Current Q-values data
+export interface CurrentQValuesData {
+  state: string;
+  qValues: number[] | null;
+  actionNames: string[];
+  bestAction: number | null;
+}
+
 // WebSocket message types
 export interface ServerMessage {
-  type: 'game_state' | 'episode_complete' | 'training_stats' | 'config_update' | 'graph_data';
+  type: 'game_state' | 'episode_complete' | 'training_stats' | 'config_update' | 'graph_data' | 'qtable_heatmap' | 'current_qvalues';
   data: any;
 }
 
 export interface ClientMessage {
-  type: 'toggle_training' | 'reset_agent' | 'update_params' | 'set_speed' | 'set_mode' | 'get_graph_data';
+  type: 'toggle_training' | 'reset_agent' | 'update_params' | 'set_speed' | 'set_mode' | 'get_graph_data' | 'get_qtable_heatmap' | 'get_current_qvalues';
   data?: any;
 }
