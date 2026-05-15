@@ -1,6 +1,4 @@
 import * as WebSocket from 'ws';
-import * as fs from 'fs';
-import * as path from 'path';
 import {
   GameState,
   GameMode,
@@ -27,14 +25,16 @@ import {
   updateGoalkeeper
 } from './physics';
 import { QLearningAgent } from './qlearning';
+import { ModelDatabase } from './database';
 
 const PORT = 3001;
 const SAVE_INTERVAL = 100;
-const MODELS_DIR = path.join(__dirname, '..', 'models');
+const METRIC_INTERVAL = 10; // Save metrics every 10 episodes for graphs
 
 class FootballServer {
   private wss: WebSocket.Server;
   private clients: Set<WebSocket> = new Set();
+  private db: ModelDatabase;
   
   private ball: BallState;
   private robot: RobotState;
@@ -66,18 +66,19 @@ class FootballServer {
     this.robot = createRobot();
     this.goalkeeper = createGoalkeeper();
     
+    // Initialize database
+    this.db = new ModelDatabase();
+    
     this.agent = new QLearningAgent();
     
-    if (!fs.existsSync(MODELS_DIR)) {
-      fs.mkdirSync(MODELS_DIR, { recursive: true });
-    }
-    
+    // Load latest model from SQLite
     this.loadLatestModel();
     
     this.wss = new WebSocket.Server({ port: PORT });
     this.setupWebSocket();
     
     console.log(`Server started on ws://localhost:${PORT}`);
+    console.log(`Database: models.db`);
     
     this.startGameLoop();
   }
@@ -93,7 +94,7 @@ class FootballServer {
       ws.on('message', (message: string) => {
         try {
           const msg: ClientMessage = JSON.parse(message.toString());
-          this.handleClientMessage(msg);
+          this.handleClientMessage(msg, ws);
         } catch (err) {
           console.error('Failed to parse message:', err);
         }
@@ -106,7 +107,7 @@ class FootballServer {
     });
   }
 
-  private handleClientMessage(msg: ClientMessage): void {
+  private handleClientMessage(msg: ClientMessage, ws: WebSocket): void {
     switch (msg.type) {
       case 'toggle_training':
         this.isRunning = !this.isRunning;
@@ -139,6 +140,10 @@ class FootballServer {
           this.mode = msg.data.mode as GameMode;
           console.log(`Mode set to ${this.mode}`);
         }
+        break;
+
+      case 'get_graph_data':
+        this.sendGraphData(ws);
         break;
     }
   }
@@ -286,6 +291,20 @@ class FootballServer {
     
     this.broadcastStats();
     
+    // Save metrics for graphs every N episodes
+    if (this.stats.totalEpisodes % METRIC_INTERVAL === 0) {
+      this.db.saveMetric(
+        this.stats.totalEpisodes,
+        this.stats.savePercentage,
+        this.stats.currentEpsilon,
+        this.stats.averageReward,
+        this.stats.saves,
+        this.stats.goals,
+        this.stats.misses
+      );
+    }
+
+    // Save model checkpoint every SAVE_INTERVAL episodes
     if (this.stats.totalEpisodes % SAVE_INTERVAL === 0) {
       this.saveModel();
     }
@@ -332,29 +351,56 @@ class FootballServer {
   }
 
   private saveModel(): void {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `model-${timestamp}.json`;
-    const filepath = path.join(MODELS_DIR, filename);
+    const modelId = this.db.saveModel(
+      this.stats.totalEpisodes,
+      this.stats.savePercentage,
+      this.agent.getEpsilon(),
+      this.agent.getHyperparameters(),
+      this.agent.getQTable()
+    );
+    console.log(`Model saved to SQLite: id=${modelId}, episodes=${this.stats.totalEpisodes}, save%=${this.stats.savePercentage.toFixed(1)}`);
     
-    fs.writeFileSync(filepath, this.agent.saveToFile());
-    console.log(`Model saved: ${filename}`);
+    // Keep only last 10 models to save space
+    this.db.deleteOldModels(10);
   }
 
   private loadLatestModel(): void {
     try {
-      const files = fs.readdirSync(MODELS_DIR)
-        .filter(f => f.startsWith('model-') && f.endsWith('.json'))
-        .sort()
-        .reverse();
-      
-      if (files.length > 0) {
-        const filepath = path.join(MODELS_DIR, files[0]);
-        const data = fs.readFileSync(filepath, 'utf-8');
+      const model = this.db.getLatestModel();
+      if (model) {
+        const data = JSON.stringify({
+          hyperparameters: JSON.parse(model.hyperparameters),
+          qTable: JSON.parse(model.qtable)
+        });
         this.agent.loadFromFile(data);
-        console.log(`Loaded model: ${files[0]}`);
+        console.log(`Loaded model from SQLite: episodes=${model.episodes}, save%=${model.save_percentage.toFixed(1)}`);
+      } else {
+        console.log('No existing model in database, starting fresh');
       }
     } catch (err) {
-      console.log('No existing model found, starting fresh');
+      console.log('Error loading model, starting fresh:', err);
+    }
+  }
+
+  private sendGraphData(ws: WebSocket): void {
+    try {
+      const metrics = this.db.getMetricsForGraphs(10); // Sample every 10 episodes
+      const graphData = {
+        episodes: metrics.map(m => m.episode),
+        savePercentages: metrics.map(m => m.save_percentage),
+        epsilons: metrics.map(m => m.epsilon),
+        averageRewards: metrics.map(m => m.average_reward),
+        saves: metrics.map(m => m.total_saves),
+        goals: metrics.map(m => m.total_goals),
+        misses: metrics.map(m => m.total_misses)
+      };
+      
+      ws.send(JSON.stringify({
+        type: 'graph_data',
+        data: graphData
+      }));
+    } catch (err) {
+      console.error('Error sending graph data:', err);
     }
   }
 }

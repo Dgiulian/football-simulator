@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Football Simulator - Q-Learning Goalkeeper</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     * {
       margin: 0;
@@ -32,22 +33,51 @@
     .main-container {
       display: flex;
       gap: 20px;
-      max-width: 1200px;
+      max-width: 1400px;
       width: 100%;
     }
     
-    .canvas-container {
+    .left-column {
       flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    
+    .canvas-container {
       display: flex;
       flex-direction: column;
       align-items: center;
     }
     
-    canvas {
+    #gameCanvas {
       border: 3px solid #4ecca3;
       border-radius: 8px;
       box-shadow: 0 0 20px rgba(78, 204, 163, 0.3);
       background: #2d5a3d;
+    }
+    
+    .charts-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 15px;
+    }
+    
+    .chart-box {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      padding: 10px;
+      height: 200px;
+    }
+    
+    .chart-title {
+      text-align: center;
+      font-size: 12px;
+      color: #a0a0a0;
+      margin-bottom: 5px;
     }
     
     .controls-panel {
@@ -205,14 +235,42 @@
       height: 20px;
       border-radius: 4px;
     }
+    
+    .refresh-btn {
+      width: 100%;
+      margin-top: 10px;
+      background: #4ecca3;
+      color: #1a1a2e;
+    }
   </style>
 </head>
 <body>
   <h1>🤖 Football Simulator - Q-Learning Goalkeeper</h1>
   
   <div class="main-container">
-    <div class="canvas-container">
-      <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div class="left-column">
+      <div class="canvas-container">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+      </div>
+      
+      <div class="charts-container">
+        <div class="chart-box">
+          <div class="chart-title">Save Percentage Over Time</div>
+          <canvas id="savePercentageChart"></canvas>
+        </div>
+        <div class="chart-box">
+          <div class="chart-title">Exploration (Epsilon) Decay</div>
+          <canvas id="epsilonChart"></canvas>
+        </div>
+        <div class="chart-box">
+          <div class="chart-title">Average Reward</div>
+          <canvas id="rewardChart"></canvas>
+        </div>
+        <div class="chart-box">
+          <div class="chart-title">Outcomes Distribution</div>
+          <canvas id="outcomesChart"></canvas>
+        </div>
+      </div>
     </div>
     
     <div class="controls-panel">
@@ -277,6 +335,8 @@
         <label>Epsilon Decay: <span id="decayValue" class="value">0.995</span></label>
         <input type="range" id="decaySlider" min="0.990" max="0.9999" step="0.0001" value="0.995">
       </div>
+      
+      <button id="refreshChartsBtn" class="refresh-btn">Refresh Charts</button>
       
       <div class="legend">
         <div class="legend-item">

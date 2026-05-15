@@ -130,13 +130,24 @@ export interface Hyperparameters {
   epsilonMin: number;
 }
 
+// Graph data for charts
+export interface GraphData {
+  episodes: number[];
+  savePercentages: number[];
+  epsilons: number[];
+  averageRewards: number[];
+  saves: number[];
+  goals: number[];
+  misses: number[];
+}
+
 // WebSocket message types
 export interface ServerMessage {
-  type: 'game_state' | 'episode_complete' | 'training_stats' | 'config_update';
+  type: 'game_state' | 'episode_complete' | 'training_stats' | 'config_update' | 'graph_data';
   data: any;
 }
 
 export interface ClientMessage {
-  type: 'toggle_training' | 'reset_agent' | 'update_params' | 'set_speed' | 'set_mode';
+  type: 'toggle_training' | 'reset_agent' | 'update_params' | 'set_speed' | 'set_mode' | 'get_graph_data';
   data?: any;
 }

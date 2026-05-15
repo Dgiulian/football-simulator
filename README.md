@@ -7,10 +7,12 @@ A real-time football goalkeeper training simulator using Q-learning reinforcemen
 - **Q-Learning Algorithm**: Tabular Q-learning with epsilon-greedy exploration
 - **Kinematic Physics**: Car-like robot movement with realistic ball physics
 - **Real-time Visualization**: HTML5 Canvas rendering with live statistics
+- **Training Analytics**: 4 interactive charts (Save %, Epsilon decay, Rewards, Outcomes)
+- **SQLite Database**: All models and metrics stored in SQLite with time-series data
 - **Training Modes**: Training mode (with exploration) and Evaluation mode (exploitation only)
 - **Speed Control**: 1x, 5x, and 10x simulation speeds
 - **Adjustable Hyperparameters**: Learning rate, discount factor, and epsilon decay
-- **Model Persistence**: Auto-saves Q-table every 100 episodes
+- **Model Persistence**: Auto-saves Q-table to SQLite every 100 episodes
 - **Statistics Tracking**: Save percentage, epsilon decay, best streak, and more
 
 ## Project Structure
@@ -18,15 +20,16 @@ A real-time football goalkeeper training simulator using Q-learning reinforcemen
 ```
 football-simulator/
 ├── client/
-│   ├── index.html      # Main UI with controls
-│   └── client.js       # Canvas rendering and WebSocket client
+│   ├── index.html      # Main UI with controls and charts
+│   └── client.js       # Canvas rendering and Chart.js graphs
 ├── server/
 │   ├── index.ts        # WebSocket server and game loop
 │   ├── physics.ts      # Physics engine (ball, robot, goalkeeper)
-│   └── qlearning.ts    # Q-learning agent implementation
+│   ├── qlearning.ts    # Q-learning agent implementation
+│   └── database.ts     # SQLite database for models & metrics
 ├── shared/
 │   └── types.ts        # Shared TypeScript types and constants
-├── models/             # Saved Q-table models
+├── models.db           # SQLite database (auto-created)
 ├── package.json
 └── tsconfig.json
 ```
@@ -156,12 +159,11 @@ Total state space: ~165 states × 4 actions = ~660 Q-values
 
 ### Ideas for Enhancement
 
-1. **Visual Charts**: Plot save percentage over time
-2. **Q-Table Inspection**: Show heatmap of most valuable states
-3. **Multiple Robots**: Train against different shooting patterns
-4. **Save/Load Models**: Manual model management UI
-5. **Curriculum Learning**: Gradually increase shot difficulty
-6. **Function Approximation**: Replace Q-table with neural network (DQN)
+1. **Q-Table Heatmap**: Visualize which states have highest Q-values
+2. **Multiple Robots**: Train against different shooting patterns
+3. **Manual Model Management**: Import/export specific checkpoints
+4. **Curriculum Learning**: Gradually increase shot difficulty
+5. **Function Approximation**: Replace Q-table with neural network (DQN)
 
 ### Code Locations
 

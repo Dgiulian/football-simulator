@@ -350,3 +350,202 @@ speedBtns.forEach(btn => {
 
 // Initial render
 render();
+
+// ============================================
+// CHARTS
+// ============================================
+
+// Chart configuration
+Chart.defaults.color = '#a0a0a0';
+Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
+
+// Save Percentage Chart
+const savePercentageCtx = document.getElementById('savePercentageChart').getContext('2d');
+const savePercentageChart = new Chart(savePercentageCtx, {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [{
+      label: 'Save %',
+      data: [],
+      borderColor: '#4ecca3',
+      backgroundColor: 'rgba(78, 204, 163, 0.1)',
+      borderWidth: 2,
+      tension: 0.4,
+      fill: true
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        max: 100,
+        ticks: { font: { size: 10 } }
+      },
+      x: {
+        ticks: { display: false }
+      }
+    }
+  }
+});
+
+// Epsilon Chart
+const epsilonCtx = document.getElementById('epsilonChart').getContext('2d');
+const epsilonChart = new Chart(epsilonCtx, {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [{
+      label: 'Epsilon',
+      data: [],
+      borderColor: '#e94560',
+      backgroundColor: 'rgba(233, 69, 96, 0.1)',
+      borderWidth: 2,
+      tension: 0.4,
+      fill: true
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        max: 1,
+        ticks: { font: { size: 10 } }
+      },
+      x: {
+        ticks: { display: false }
+      }
+    }
+  }
+});
+
+// Reward Chart
+const rewardCtx = document.getElementById('rewardChart').getContext('2d');
+const rewardChart = new Chart(rewardCtx, {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [{
+      label: 'Avg Reward',
+      data: [],
+      borderColor: '#f9a825',
+      backgroundColor: 'rgba(249, 168, 37, 0.1)',
+      borderWidth: 2,
+      tension: 0.4,
+      fill: true
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false }
+    },
+    scales: {
+      y: {
+        ticks: { font: { size: 10 } }
+      },
+      x: {
+        ticks: { display: false }
+      }
+    }
+  }
+});
+
+// Outcomes Chart (Pie)
+const outcomesCtx = document.getElementById('outcomesChart').getContext('2d');
+const outcomesChart = new Chart(outcomesCtx, {
+  type: 'doughnut',
+  data: {
+    labels: ['Saves', 'Goals', 'Misses'],
+    datasets: [{
+      data: [0, 0, 0],
+      backgroundColor: ['#4ecca3', '#e94560', '#ffa500'],
+      borderWidth: 0
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: { font: { size: 10 }, boxWidth: 12 }
+      }
+    }
+  }
+});
+
+// Update charts from graph data
+function updateCharts(graphData) {
+  // Update Save Percentage Chart
+  savePercentageChart.data.labels = graphData.episodes.map(e => e.toString());
+  savePercentageChart.data.datasets[0].data = graphData.savePercentages;
+  savePercentageChart.update('none');
+
+  // Update Epsilon Chart
+  epsilonChart.data.labels = graphData.episodes.map(e => e.toString());
+  epsilonChart.data.datasets[0].data = graphData.epsilons;
+  epsilonChart.update('none');
+
+  // Update Reward Chart
+  rewardChart.data.labels = graphData.episodes.map(e => e.toString());
+  rewardChart.data.datasets[0].data = graphData.averageRewards;
+  rewardChart.update('none');
+
+  // Update Outcomes Chart
+  if (graphData.saves.length > 0) {
+    const lastIdx = graphData.saves.length - 1;
+    outcomesChart.data.datasets[0].data = [
+      graphData.saves[lastIdx],
+      graphData.goals[lastIdx],
+      graphData.misses[lastIdx]
+    ];
+    outcomesChart.update();
+  }
+}
+
+// Request graph data from server
+function requestGraphData() {
+  ws.send(JSON.stringify({ type: 'get_graph_data' }));
+}
+
+// Handle graph data message
+ws.onmessage = (event) => {
+  const msg = JSON.parse(event.data);
+
+  switch (msg.type) {
+    case 'game_state':
+      gameState = msg.data;
+      render();
+      break;
+    case 'episode_complete':
+      showEpisodeResult(msg.data);
+      break;
+    case 'training_stats':
+      updateStats(msg.data);
+      break;
+    case 'graph_data':
+      updateCharts(msg.data);
+      break;
+  }
+};
+
+// Refresh charts button
+document.getElementById('refreshChartsBtn').addEventListener('click', requestGraphData);
+
+// Request graph data periodically (every 5 seconds)
+setInterval(requestGraphData, 5000);
+
+// Initial request
+setTimeout(requestGraphData, 1000);
