@@ -120,6 +120,7 @@ export interface TrainingStats {
   bestStreak: number;
   currentStreak: number;
   trainingTime: number; // seconds
+  replayBufferSize: number; // Experience replay buffer size
 }
 
 export interface Hyperparameters {

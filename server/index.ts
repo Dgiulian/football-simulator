@@ -56,7 +56,8 @@ class FootballServer {
     averageReward: 0,
     bestStreak: 0,
     currentStreak: 0,
-    trainingTime: 0
+    trainingTime: 0,
+    replayBufferSize: 0
   };
   private recentRewards: number[] = [];
   private startTime: number = Date.now();
@@ -167,11 +168,13 @@ class FootballServer {
       averageReward: 0,
       bestStreak: 0,
       currentStreak: 0,
-      trainingTime: 0
+      trainingTime: 0,
+      replayBufferSize: 0
     };
     this.recentRewards = [];
     this.startTime = Date.now();
     this.episodeFrameCount = 0;
+    this.agent.clearReplayBuffer();
   }
 
   private startGameLoop(): void {
@@ -291,7 +294,8 @@ class FootballServer {
       : 0;
     
     this.stats.currentEpsilon = this.agent.getEpsilon();
-    
+    this.stats.replayBufferSize = this.agent.getReplayBufferSize();
+
     this.broadcastMessage({
       type: 'episode_complete',
       data: { outcome, reward, episode: this.stats.totalEpisodes }

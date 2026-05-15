@@ -21,12 +21,57 @@ export interface QTable {
   [state: string]: number[]; // Array of Q-values for each action
 }
 
+// Experience Replay Buffer
+interface Transition {
+  state: string;
+  action: Action;
+  reward: number;
+  nextState: string | null; // null for terminal states
+  done: boolean;
+}
+
+class ReplayBuffer {
+  private buffer: Transition[] = [];
+  private maxSize: number;
+
+  constructor(maxSize: number = 1000) {
+    this.maxSize = maxSize;
+  }
+
+  add(transition: Transition): void {
+    this.buffer.push(transition);
+    if (this.buffer.length > this.maxSize) {
+      this.buffer.shift(); // Remove oldest
+    }
+  }
+
+  sample(batchSize: number): Transition[] {
+    if (this.buffer.length < batchSize) {
+      return [...this.buffer];
+    }
+    
+    // Random sampling without replacement
+    const shuffled = [...this.buffer].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, batchSize);
+  }
+
+  size(): number {
+    return this.buffer.length;
+  }
+
+  clear(): void {
+    this.buffer = [];
+  }
+}
+
 export class QLearningAgent {
   private qTable: QTable = {};
   private hyperparams: Hyperparameters;
   private lastState: string | null = null;
   private lastAction: Action | null = null;
   private contactMade: boolean = false;
+  private replayBuffer: ReplayBuffer;
+  private batchSize: number = 32;
 
   constructor(hyperparams?: Partial<Hyperparameters>) {
     this.hyperparams = {
@@ -36,6 +81,7 @@ export class QLearningAgent {
       epsilonDecay: hyperparams?.epsilonDecay ?? DEFAULT_EPSILON_DECAY,
       epsilonMin: hyperparams?.epsilonMin ?? DEFAULT_EPSILON_MIN
     };
+    this.replayBuffer = new ReplayBuffer(1000);
   }
 
   private discretizeValue(value: number, buckets: number[]): number {
@@ -88,6 +134,17 @@ export class QLearningAgent {
   }
 
   storeTransition(state: string, action: Action): void {
+    // Store previous transition if exists
+    if (this.lastState !== null && this.lastAction !== null) {
+      this.replayBuffer.add({
+        state: this.lastState,
+        action: this.lastAction,
+        reward: 0, // Will be updated later
+        nextState: state,
+        done: false
+      });
+    }
+    
     this.lastState = state;
     this.lastAction = action;
     this.contactMade = false;
@@ -129,16 +186,41 @@ export class QLearningAgent {
     // Small time penalty per step
     reward -= 0.01;
 
-    // Q-learning update
-    const currentQ = this.qTable[this.lastState][this.lastAction];
-    // For terminal states, next max Q is 0
-    const maxNextQ = 0;
+    // Add terminal transition to replay buffer
+    this.replayBuffer.add({
+      state: this.lastState,
+      action: this.lastAction,
+      reward: reward,
+      nextState: null,
+      done: true
+    });
+
+    // Experience Replay: Sample batch and update multiple transitions
+    const batch = this.replayBuffer.sample(this.batchSize);
     
-    const newQ = currentQ + this.hyperparams.learningRate * (
-      reward + this.hyperparams.discountFactor * maxNextQ - currentQ
-    );
-    
-    this.qTable[this.lastState][this.lastAction] = newQ;
+    for (const transition of batch) {
+      // Ensure Q-table entry exists
+      if (!this.qTable[transition.state]) {
+        this.qTable[transition.state] = [0, 0, 0, 0];
+      }
+
+      // Calculate target Q-value
+      let targetQ: number;
+      if (transition.done || transition.nextState === null) {
+        // Terminal state: target is just the reward
+        targetQ = transition.reward;
+      } else {
+        // Non-terminal: target is reward + discounted max future Q
+        const nextQValues = this.qTable[transition.nextState] || [0, 0, 0, 0];
+        const maxNextQ = Math.max(...nextQValues);
+        targetQ = transition.reward + this.hyperparams.discountFactor * maxNextQ;
+      }
+
+      // Q-learning update
+      const currentQ = this.qTable[transition.state][transition.action];
+      const newQ = currentQ + this.hyperparams.learningRate * (targetQ - currentQ);
+      this.qTable[transition.state][transition.action] = newQ;
+    }
 
     // Decay epsilon
     if (this.hyperparams.epsilon > this.hyperparams.epsilonMin) {
@@ -146,6 +228,14 @@ export class QLearningAgent {
     }
 
     return reward;
+  }
+
+  getReplayBufferSize(): number {
+    return this.replayBuffer.size();
+  }
+
+  clearReplayBuffer(): void {
+    this.replayBuffer.clear();
   }
 
   getEpsilon(): number {
