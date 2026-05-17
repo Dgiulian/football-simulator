@@ -24,6 +24,8 @@ football-simulator/
 │   └── client.js       # Canvas rendering and Chart.js graphs
 ├── server/
 │   ├── index.ts        # WebSocket server and game loop
+│   ├── agents.ts       # Multi-agent system with presets
+│   ├── agents-example.ts # Usage examples for agents
 │   ├── physics.ts      # Physics engine (ball, robot, goalkeeper)
 │   ├── qlearning.ts    # Q-learning agent implementation
 │   └── database.ts     # SQLite database for models & metrics
@@ -197,6 +199,69 @@ Check that:
 1. Server is running (`Server started on ws://localhost:3001`)
 2. Browser supports WebSocket
 3. No firewall blocking port 3001
+
+## Agents System
+
+The project includes a powerful multi-agent system (`server/agents.ts`) supporting different agent types:
+
+### Agent Types
+
+1. **QLearningAgent**: Tabular Q-learning with experience replay
+2. **RuleBasedAgent**: Hand-crafted rules for comparison
+3. **RandomAgent**: Random actions as baseline
+
+### Built-in Presets
+
+```typescript
+// Q-Learning variants
+AgentPresets.balancedQLearning()      // Standard settings
+AgentPresets.aggressiveQLearning()    // Fast learning
+AgentPresets.cautiousQLearning()      // Conservative
+
+// Rule-based variants
+AgentPresets.perfectGoalkeeper()      // Optimal reactions
+AgentPresets.slowGoalkeeper()         // Human-like delay
+AgentPresets.noPredictionGoalkeeper() // Reactive only
+
+// Baseline
+AgentPresets.randomAgent()            // Random actions
+```
+
+### Creating Agents
+
+```typescript
+import { AgentFactory, MultiAgentManager } from './server/agents';
+
+// From preset
+const agent = AgentFactory.createFromPreset('balancedQLearning');
+
+// Custom configuration
+const custom = AgentFactory.createAgent({
+  name: 'My Agent',
+  type: 'qlearning',
+  hyperparameters: { learningRate: 0.3, epsilonDecay: 0.998 },
+  useReplayBuffer: true,
+  batchSize: 32
+});
+```
+
+### Multi-Agent Training
+
+```typescript
+const manager = new MultiAgentManager();
+
+// Register multiple agents
+manager.registerAgent('agent1', AgentFactory.createFromPreset('balancedQLearning'));
+manager.registerAgent('agent2', AgentFactory.createFromPreset('perfectGoalkeeper'));
+
+// Get leaderboard
+const leaderboard = manager.getLeaderboard();
+leaderboard.forEach((entry, i) => {
+  console.log(`${i+1}. ${entry.agent.getName()}: ${entry.savePercentage.toFixed(1)}%`);
+});
+```
+
+See `server/agents-example.ts` for complete usage examples.
 
 ## License
 
